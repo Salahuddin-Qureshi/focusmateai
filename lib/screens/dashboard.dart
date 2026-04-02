@@ -38,146 +38,151 @@ class DashboardScreen extends StatelessWidget {
             ),
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'FocusMate AI',
-                            style: GoogleFonts.outfit(
-                              fontSize: 16,
-                              color: AppColors.accentCyan,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          Text(
-                            'Daily Overview',
-                            style: GoogleFonts.outfit(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const CircleAvatar(
-                        backgroundColor: AppColors.accentViolet,
-                        child: Icon(LucideIcons.user, color: Colors.white, size: 20),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  // Central Focus Score
-                  Center(
-                    child: Stack(
-                      alignment: Alignment.center,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        SizedBox(
-                          width: 200,
-                          height: 200,
-                          child: CircularProgressIndicator(
-                            value: 0.85,
-                            strokeWidth: 12,
-                            backgroundColor: Colors.white10,
-                            color: AppColors.accentViolet,
-                          ),
-                        ),
                         Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
                             Text(
-                              '85%',
-                              style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textMain,
+                              'FocusMate AI',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                color: AppColors.accentCyan,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.2,
                               ),
                             ),
                             Text(
-                              'Focus Score',
-                              style: TextStyle(
-                                color: AppColors.textDim,
-                                fontSize: 14,
+                              'Daily Overview',
+                              style: GoogleFonts.outfit(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  // Stats Cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Productive',
-                          value: '4h 12m',
-                          icon: LucideIcons.brain,
-                          color: AppColors.accentCyan,
+                        const CircleAvatar(
+                          backgroundColor: AppColors.accentViolet,
+                          child: Icon(LucideIcons.user, color: Colors.white, size: 20),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: GlassCard(
-                          title: 'Distractions',
-                          value: '45m',
-                          icon: LucideIcons.clapperboard,
-                          color: Colors.redAccent,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // AI Insight Bubble
-                  GlassmorphicContainer(
-                    width: double.infinity,
-                    height: 100,
-                    borderRadius: 20,
-                    blur: 20,
-                    alignment: Alignment.center,
-                    border: 2,
-                    linearGradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withAlpha(20),
-                        Colors.white.withAlpha(5),
                       ],
                     ),
-                    borderGradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.accentViolet.withAlpha(100),
-                        AppColors.accentCyan.withAlpha(100),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Row(
+                    const SizedBox(height: 40),
+                    // Central Focus Score
+                    Center(
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
-                          Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 28),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(
-                              'You are 15 mins away from your deep work goal! Switch back?',
-                              style: TextStyle(fontSize: 14, height: 1.4),
+                          SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: CircularProgressIndicator(
+                              value: 0.85,
+                              strokeWidth: 12,
+                              backgroundColor: Colors.white10,
+                              color: AppColors.accentViolet,
                             ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                '85%',
+                                style: TextStyle(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textMain,
+                                ),
+                              ),
+                              Text(
+                                'Focus Score',
+                                style: TextStyle(
+                                  color: AppColors.textDim,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 40),
+                    // Stats Cards
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GlassCard(
+                            title: 'Productive',
+                            value: '4h 12m',
+                            icon: LucideIcons.brain,
+                            color: AppColors.accentCyan,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GlassCard(
+                            title: 'Distractions',
+                            value: '45m',
+                            icon: LucideIcons.clapperboard,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    // AI Insight Bubble
+                    GlassmorphicContainer(
+                      width: double.infinity,
+                      height: 100,
+                      borderRadius: 20,
+                      blur: 20,
+                      alignment: Alignment.center,
+                      border: 2,
+                      linearGradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withAlpha(20),
+                          Colors.white.withAlpha(5),
+                        ],
+                      ),
+                      borderGradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          AppColors.accentViolet.withAlpha(100),
+                          AppColors.accentCyan.withAlpha(100),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Row(
+                          children: [
+                            Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 28),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                'You are 15 mins away from your deep work goal! Switch back?',
+                                style: TextStyle(fontSize: 14, height: 1.4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
           ),
