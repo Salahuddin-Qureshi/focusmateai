@@ -17,22 +17,26 @@ class AppUsageInfo {
 }
 
 class UsageService {
-  static Future<List<AppUsageInfo>> getUsageStats() async {
-    if (kIsWeb) {
-      return _getMockUsageStats();
-    } else {
-      return _getRealAndroidUsageStats();
-    }
+  static Future<bool> checkPermission() async {
+    if (kIsWeb) return true;
+    return await UsageStats.checkUsagePermission() ?? false;
   }
 
-  static List<AppUsageInfo> _getMockUsageStats() {
-    return [
-      AppUsageInfo(packageName: 'Instagram', usageTime: '2h 15m', icon: Icons.camera_alt, color: Colors.purpleAccent),
-      AppUsageInfo(packageName: 'TikTok', usageTime: '1h 45m', icon: Icons.music_video, color: Colors.cyanAccent),
-      AppUsageInfo(packageName: 'Slack', usageTime: '3h 12m', icon: Icons.work, color: Colors.greenAccent),
-      AppUsageInfo(packageName: 'Chrome', usageTime: '4h 50m', icon: Icons.language, color: Colors.blueAccent),
-      AppUsageInfo(packageName: 'Netflix', usageTime: '1h 10m', icon: Icons.movie, color: Colors.redAccent),
-    ];
+  static Future<void> grantPermission() async {
+    if (kIsWeb) return;
+    await UsageStats.grantUsagePermission();
+  }
+
+  static Future<List<AppUsageInfo>> getUsageStats() async {
+    if (kIsWeb) {
+      return [];
+    } else {
+      bool hasPermission = await checkPermission();
+      if (!hasPermission) {
+        return [];
+      }
+      return _getRealAndroidUsageStats();
+    }
   }
 
   static Future<List<AppUsageInfo>> _getRealAndroidUsageStats() async {
@@ -42,25 +46,57 @@ class UsageService {
 
       List<UsageInfo> usageStats = await UsageStats.queryUsageStats(startDate, endDate);
       
-      // Filter out apps with zero usage and sort
-      usageStats = usageStats.where((element) => int.parse(element.totalTimeInForeground!) > 0).toList();
-      usageStats.sort((a, b) => int.parse(b.totalTimeInForeground!).compareTo(int.parse(a.totalTimeInForeground!)));
+      if (usageStats.isEmpty) return [];
 
-      return usageStats.take(10).map((stats) {
-        final minutes = int.parse(stats.totalTimeInForeground!) ~/ 60000;
+      // Filter out apps with zero usage and sort
+      var filteredStats = usageStats.where((element) {
+        final time = int.tryParse(element.totalTimeInForeground ?? '0') ?? 0;
+        return time > 0;
+      }).toList();
+
+      filteredStats.sort((a, b) {
+        final timeA = int.tryParse(a.totalTimeInForeground ?? '0') ?? 0;
+        final timeB = int.tryParse(b.totalTimeInForeground ?? '0') ?? 0;
+        return timeB.compareTo(timeA);
+      });
+
+      return filteredStats.take(15).map((stats) {
+        final totalTime = int.tryParse(stats.totalTimeInForeground ?? '0') ?? 0;
+        final minutes = totalTime ~/ 60000;
         final h = minutes ~/ 60;
         final m = minutes % 60;
         
+        final displayName = stats.packageName!.split('.').last;
+        final formattedName = displayName[0].toUpperCase() + displayName.substring(1);
+
         return AppUsageInfo(
-          packageName: stats.packageName!.split('.').last.toUpperCase(),
+          packageName: formattedName,
           usageTime: h > 0 ? '${h}h ${m}m' : '${m}m',
-          icon: Icons.apps, // In a real app, you would fetch the app icon using package_info
-          color: Colors.blueAccent,
+          icon: _getIconForPackage(stats.packageName!),
+          color: _getColorForPackage(stats.packageName!),
         );
       }).toList();
     } catch (e) {
       debugPrint('Error fetching Android usage stats: $e');
-      return _getMockUsageStats();
+      return [];
     }
+  }
+
+  static IconData _getIconForPackage(String packageName) {
+    if (packageName.contains('instagram')) return Icons.camera_alt;
+    if (packageName.contains('youtube')) return Icons.play_circle_filled;
+    if (packageName.contains('whatsapp')) return Icons.message;
+    if (packageName.contains('chrome')) return Icons.language;
+    if (packageName.contains('facebook')) return Icons.facebook;
+    return Icons.apps;
+  }
+
+  static Color _getColorForPackage(String packageName) {
+    if (packageName.contains('instagram')) return Colors.purpleAccent;
+    if (packageName.contains('youtube')) return Colors.redAccent;
+    if (packageName.contains('whatsapp')) return Colors.greenAccent;
+    if (packageName.contains('chrome')) return Colors.blueAccent;
+    if (packageName.contains('facebook')) return Colors.blue;
+    return Colors.cyanAccent;
   }
 }
