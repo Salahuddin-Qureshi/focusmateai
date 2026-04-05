@@ -3,6 +3,9 @@ import 'package:glassmorphism/glassmorphism.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:focusmate_ai/theme.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -140,6 +143,8 @@ class DashboardScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 24),
+                    // Live Location Proof (Real Data)
+                    _LiveLocationCard(),
                     // AI Insight Bubble
                     GlassmorphicContainer(
                       width: double.infinity,
@@ -186,6 +191,76 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveLocationCard extends StatefulWidget {
+  @override
+  State<_LiveLocationCard> createState() => _LiveLocationCardState();
+}
+
+class _LiveLocationCardState extends State<_LiveLocationCard> {
+  String _posStr = 'Waiting for permission...';
+
+  @override
+  void initState() {
+    super.initState();
+    _getLocation();
+  }
+
+  Future<void> _getLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition();
+        
+        // Reverse Geocoding using free OpenStreetMap API (Nominatim)
+        final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}');
+        final resp = await http.get(uri, headers: {'User-Agent': 'FocusMate_AI_App'});
+        final data = json.decode(resp.body);
+        
+        final city = data['address']['city'] ?? data['address']['town'] ?? data['address']['suburb'] ?? 'Unknown Area';
+        // Wait... users can have country too
+        final country = data['address']['country'] ?? '';
+        
+        if (mounted) {
+          setState(() => _posStr = '$city, $country');
+        }
+      } else {
+        if (mounted) setState(() => _posStr = 'Location Denied');
+      }
+    } catch (e) {
+      if (mounted) setState(() => _posStr = 'Error fetching area name');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphicContainer(
+      width: double.infinity,
+      height: 100,
+      borderRadius: 20,
+      blur: 20,
+      border: 1,
+      linearGradient: LinearGradient(
+        colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(5)],
+      ),
+      borderGradient: LinearGradient(
+        colors: [AppColors.accentCyan.withAlpha(80), Colors.white.withAlpha(10)],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(LucideIcons.mapPin, color: AppColors.accentCyan),
+          const SizedBox(width: 12),
+          Text(_posStr, style: const TextStyle(fontSize: 16)),
         ],
       ),
     );

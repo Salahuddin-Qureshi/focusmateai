@@ -77,6 +77,8 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _permissionTile(context, LucideIcons.image, 'Photos & Gallery', Permission.photos),
               const SizedBox(height: 16),
+              _permissionTile(context, LucideIcons.mapPin, 'Location Access', Permission.location),
+              const SizedBox(height: 16),
               _permissionTile(context, LucideIcons.userCheck, 'Contacts Access', Permission.contacts),
               const SizedBox(height: 16),
               _permissionTile(context, LucideIcons.barChart2, 'Usage Stats (Android)', Permission.notification), // We use notification as stand-in for web tests
