@@ -7,15 +7,92 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 
-class DashboardScreen extends StatelessWidget {
+import 'package:focusmate_ai/services/api_service.dart';
+
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  String _currentGoal = "Setting my goal...";
+  String _aiVerdict = "Waiting for your first evaluation...";
+  bool _isEvaluating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final goal = await ApiService.getGoal();
+    final verdict = await ApiService.getLastVerdict();
+    if (mounted) {
+      setState(() {
+        _currentGoal = goal ?? "Become a Flutter Expert";
+        _aiVerdict = verdict ?? "Evaluation results will appear here.";
+      });
+    }
+  }
+
+  Future<void> _showGoalDialog() async {
+    final controller = TextEditingController(text: _currentGoal);
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Set Your Focus Goal'),
+        content: TextField(
+          controller: controller,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            hintText: "e.g. Become a software engineer",
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await ApiService.saveGoal(controller.text);
+              setState(() => _currentGoal = controller.text);
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('Save Goal'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runAIEvaluation() async {
+    setState(() => _isEvaluating = true);
+    final result = await ApiService.evaluateUsage();
+    if (mounted) {
+      setState(() {
+        _isEvaluating = false;
+        if (result.containsKey('verdict')) {
+          _aiVerdict = result['verdict'];
+        } else {
+          _aiVerdict = "Connection Error. Check if backend is running.";
+        }
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient blobs (Aesthetic)
+          // Background Gradient blobs
           Positioned(
             top: -100,
             left: -100,
@@ -25,18 +102,6 @@ class DashboardScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.accentViolet.withAlpha(38),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 100,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accentCyan.withAlpha(26),
               ),
             ),
           ),
@@ -80,50 +145,56 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 40),
-                    // Central Focus Score
-                    Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SizedBox(
-                            width: 200,
-                            height: 200,
-                            child: CircularProgressIndicator(
-                              value: 0.85,
-                              strokeWidth: 12,
-                              backgroundColor: Colors.white10,
-                              color: AppColors.accentViolet,
-                            ),
-                          ),
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Text(
-                                '85%',
-                                style: TextStyle(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textMain,
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Goal Section
+                    GestureDetector(
+                      onTap: _showGoalDialog,
+                      child: GlassmorphicContainer(
+                        width: double.infinity,
+                        height: 100,
+                        borderRadius: 24,
+                        blur: 20,
+                        border: 1,
+                        linearGradient: LinearGradient(
+                          colors: [Colors.white.withAlpha(15), Colors.white.withAlpha(5)],
+                        ),
+                        borderGradient: LinearGradient(
+                          colors: [AppColors.accentCyan.withAlpha(50), Colors.white.withAlpha(10)],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Row(
+                            children: [
+                              const Icon(LucideIcons.target, color: AppColors.accentCyan),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Primary Goal', style: TextStyle(color: AppColors.textDim, fontSize: 12)),
+                                    Text(_currentGoal, 
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Text(
-                                'Focus Score',
-                                style: TextStyle(
-                                  color: AppColors.textDim,
-                                  fontSize: 14,
-                                ),
-                              ),
+                              const Icon(LucideIcons.edit3, size: 16, color: AppColors.textDim),
                             ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 40),
+
+                    const SizedBox(height: 24),
+                    
                     // Stats Cards
                     Row(
                       children: [
-                        Expanded(
+                        const Expanded(
                           child: GlassCard(
                             title: 'Productive',
                             value: '4h 12m',
@@ -132,7 +203,7 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        Expanded(
+                        const Expanded(
                           child: GlassCard(
                             title: 'Distractions',
                             value: '45m',
@@ -142,50 +213,71 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 24),
-                    // Live Location Proof (Real Data)
-                    _LiveLocationCard(),
-                    // AI Insight Bubble
+                    
+                    // AI Focus Verdict
+                    const Text('AI Focus Verdict', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
                     GlassmorphicContainer(
                       width: double.infinity,
-                      height: 100,
-                      borderRadius: 20,
-                      blur: 20,
-                      alignment: Alignment.center,
+                      height: 160,
+                      borderRadius: 24,
+                      blur: 30,
                       border: 2,
                       linearGradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withAlpha(20),
-                          Colors.white.withAlpha(5),
-                        ],
+                        colors: [AppColors.accentViolet.withAlpha(20), Colors.black.withAlpha(10)],
                       ),
-                      borderGradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.accentViolet.withAlpha(100),
-                          AppColors.accentCyan.withAlpha(100),
-                        ],
+                      borderGradient: const LinearGradient(
+                        colors: [AppColors.accentViolet, AppColors.accentCyan],
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Row(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 28),
-                            const SizedBox(width: 16),
+                            Row(
+                              children: [
+                                const Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 20),
+                                const SizedBox(width: 8),
+                                Text('AUTO-GEN COACH', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
                             Expanded(
-                              child: Text(
-                                'You are 15 mins away from your deep work goal! Switch back?',
-                                style: TextStyle(fontSize: 14, height: 1.4),
+                              child: Text(_aiVerdict, 
+                                style: const TextStyle(height: 1.4, fontSize: 14),
+                                overflow: TextOverflow.fade,
                               ),
                             ),
+                            if (_isEvaluating) 
+                              const LinearProgressIndicator(backgroundColor: Colors.white10, color: AppColors.accentCyan)
                           ],
                         ),
                       ),
                     ),
+                    
                     const SizedBox(height: 20),
+                    
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        onPressed: _isEvaluating ? null : _runAIEvaluation,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.accentCyan,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: Text(_isEvaluating ? 'Agents Evaluating...' : 'Evaluate Today\'s Progress', 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    _LiveLocationCard(),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -217,19 +309,31 @@ class _LiveLocationCardState extends State<_LiveLocationCard> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-        
-        List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
-        
+
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+
+        List<Placemark> placemarks = await placemarkFromCoordinates(
+          pos.latitude,
+          pos.longitude,
+        );
+
         if (placemarks.isNotEmpty) {
           final place = placemarks.first;
-          final city = place.locality ?? place.subAdministrativeArea ?? place.administrativeArea ?? 'Unknown City';
+          final city =
+              place.locality ??
+              place.subAdministrativeArea ??
+              place.administrativeArea ??
+              'Unknown City';
           final subArea = place.subLocality ?? '';
-          
+
           if (mounted) {
-            setState(() => _posStr = subArea.isNotEmpty ? '$subArea, $city' : city);
+            setState(
+              () => _posStr = subArea.isNotEmpty ? '$subArea, $city' : city,
+            );
           }
         }
       } else {
@@ -252,7 +356,10 @@ class _LiveLocationCardState extends State<_LiveLocationCard> {
         colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(5)],
       ),
       borderGradient: LinearGradient(
-        colors: [AppColors.accentCyan.withAlpha(80), Colors.white.withAlpha(10)],
+        colors: [
+          AppColors.accentCyan.withAlpha(80),
+          Colors.white.withAlpha(10),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -292,25 +399,22 @@ class GlassCard extends StatelessWidget {
       linearGradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          Colors.white.withAlpha(10),
-          Colors.white.withAlpha(5),
-        ],
+        colors: [Colors.white.withAlpha(10), Colors.white.withAlpha(5)],
       ),
       borderGradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [
-          color.withAlpha(60),
-          Colors.white.withAlpha(10),
-        ],
+        colors: [color.withAlpha(60), Colors.white.withAlpha(10)],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 28),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           Text(title, style: TextStyle(color: AppColors.textDim, fontSize: 12)),
         ],
       ),
