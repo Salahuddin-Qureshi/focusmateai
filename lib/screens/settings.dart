@@ -5,53 +5,107 @@ import 'package:glassmorphism/glassmorphism.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _requestPermission(BuildContext context, Permission permission, String name) async {
-    final status = await permission.request();
-    String message = '';
-    Color color = Colors.blue;
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
 
-    if (status.isGranted) {
-      _showSuccessDialog(context, name);
-    } else if (status.isDenied) {
-      message = '$name Permission Denied.';
-      color = Colors.redAccent;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: color),
-      );
-    } else if (status.isPermanentlyDenied) {
-      message = '$name is permanently denied. Open settings?';
-      color = Colors.orange;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: color),
-      );
-    }
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
+  Map<Permission, bool> _permissionStats = {};
 
-    if (status.isPermanentlyDenied && !kIsWeb) {
-      await openAppSettings();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkAllPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAllPermissions();
     }
   }
 
-  void _showSuccessDialog(BuildContext context, String name) {
+  Future<void> _checkAllPermissions() async {
+    final permissions = [
+      Permission.camera,
+      Permission.microphone,
+      Permission.photos,
+      Permission.location,
+      Permission.contacts,
+    ];
+
+    Map<Permission, bool> stats = {};
+    for (var p in permissions) {
+      stats[p] = await p.isGranted;
+    }
+
+    if (mounted) {
+      setState(() {
+        _permissionStats = stats;
+      });
+    }
+  }
+
+  Future<void> _requestPermission(Permission permission, String name) async {
+    final status = await permission.request();
+
+    if (status.isGranted) {
+      _showSuccessDialog(name);
+    } else if (status.isPermanentlyDenied && !kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '$name is permanently denied. Please enable in settings.',
+          ),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: () => openAppSettings(),
+          ),
+        ),
+      );
+    }
+
+    _checkAllPermissions();
+  }
+
+  void _showSuccessDialog(String name) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.background,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: AppColors.accentCyan, width: 2)),
-        title: Row(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppColors.accentCyan, width: 2),
+        ),
+        title: const Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 30),
-            const SizedBox(width: 12),
-            const Text('Permission Granted'),
+            Icon(Icons.check_circle, color: Colors.green, size: 30),
+            SizedBox(width: 12),
+            Text('Permission Granted'),
           ],
         ),
-        content: Text('The $name has been perfectly authorized for this session.'),
+        content: Text('The $name has been successfully authorized.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Great!', style: TextStyle(color: AppColors.accentCyan, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Great!',
+              style: TextStyle(
+                color: AppColors.accentCyan,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -62,7 +116,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('System Permissions'),
+        title: const Text('Privacy Center'),
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
@@ -70,24 +124,44 @@ class SettingsScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24.0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _permissionTile(context, LucideIcons.camera, 'Camera Access', Permission.camera),
-              const SizedBox(height: 16),
-              _permissionTile(context, LucideIcons.mic, 'Microphone Access', Permission.microphone),
-              const SizedBox(height: 16),
-              _permissionTile(context, LucideIcons.image, 'Photos & Gallery', Permission.photos),
-              const SizedBox(height: 16),
-              _permissionTile(context, LucideIcons.mapPin, 'Location Access', Permission.location),
-              const SizedBox(height: 16),
-              _permissionTile(context, LucideIcons.userCheck, 'Contacts Access', Permission.contacts),
-              const SizedBox(height: 16),
-              _permissionTile(context, LucideIcons.barChart2, 'Usage Stats (Android)', Permission.notification), // We use notification as stand-in for web tests
-              const SizedBox(height: 40),
               const Text(
-                'Note: Camera and Mic will show real Chrome prompts. Contacts and Photos are mobile-specific but coded for your APK.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textDim, fontSize: 12),
+                'Safety & Privacy',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 8),
+              const Text(
+                'Manage how FocusMate AI interacts with your hardware.',
+                style: TextStyle(color: AppColors.textDim),
+              ),
+              const SizedBox(height: 32),
+              _permissionTile(LucideIcons.camera, 'Camera', Permission.camera),
+              const SizedBox(height: 16),
+              _permissionTile(
+                LucideIcons.mic,
+                'Microphone',
+                Permission.microphone,
+              ),
+              const SizedBox(height: 16),
+              _permissionTile(
+                LucideIcons.image,
+                'Gallery & Photos',
+                Permission.photos,
+              ),
+              const SizedBox(height: 16),
+              _permissionTile(
+                LucideIcons.mapPin,
+                'Location Services',
+                Permission.location,
+              ),
+              const SizedBox(height: 16),
+              _permissionTile(
+                LucideIcons.userCheck,
+                'Contacts',
+                Permission.contacts,
+              ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -95,7 +169,9 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _permissionTile(BuildContext context, IconData icon, String title, Permission permission) {
+  Widget _permissionTile(IconData icon, String title, Permission permission) {
+    bool isGranted = _permissionStats[permission] ?? false;
+
     return GlassmorphicContainer(
       width: double.infinity,
       height: 90,
@@ -103,14 +179,15 @@ class SettingsScreen extends StatelessWidget {
       blur: 15,
       border: 1,
       linearGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
         colors: [Colors.white.withAlpha(10), Colors.white.withAlpha(5)],
       ),
       borderGradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [AppColors.accentCyan.withAlpha(80), Colors.white.withAlpha(10)],
+        colors: [
+          isGranted
+              ? Colors.green.withAlpha(80)
+              : AppColors.accentCyan.withAlpha(80),
+          Colors.white.withAlpha(10),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -119,24 +196,56 @@ class SettingsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.accentViolet.withAlpha(40),
+                color: (isGranted ? Colors.green : AppColors.accentViolet)
+                    .withAlpha(40),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: AppColors.accentViolet, size: 24),
+              child: Icon(
+                icon,
+                color: isGranted ? Colors.greenAccent : AppColors.accentViolet,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              onPressed: () => _requestPermission(context, permission, title),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentCyan,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    isGranted ? 'Access Granted' : 'Requires Approval',
+                    style: TextStyle(
+                      color: isGranted ? Colors.greenAccent : AppColors.textDim,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
-              child: const Text('Allow'),
             ),
+            if (!isGranted)
+              ElevatedButton(
+                onPressed: () => _requestPermission(permission, title),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accentCyan,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Enable',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              )
+            else
+              const Icon(Icons.check_circle, color: Colors.greenAccent),
           ],
         ),
       ),

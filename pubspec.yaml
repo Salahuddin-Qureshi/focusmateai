@@ -44,7 +44,9 @@ dependencies:
   usage_stats:
     path: local_plugins/usage_stats
   geolocator: ^12.0.0
+  geocoding: ^3.0.0
   http: ^1.2.1
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:

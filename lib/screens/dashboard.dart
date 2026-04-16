@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:focusmate_ai/theme.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 
 class DashboardScreen extends StatelessWidget {
@@ -219,25 +219,24 @@ class _LiveLocationCardState extends State<_LiveLocationCard> {
       }
       
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        final pos = await Geolocator.getCurrentPosition();
+        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
         
-        // Reverse Geocoding using free OpenStreetMap API (Nominatim)
-        final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.latitude}&lon=${pos.longitude}');
-        final resp = await http.get(uri, headers: {'User-Agent': 'FocusMate_AI_App'});
-        final data = json.decode(resp.body);
+        List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
         
-        final city = data['address']['city'] ?? data['address']['town'] ?? data['address']['suburb'] ?? 'Unknown Area';
-        // Wait... users can have country too
-        final country = data['address']['country'] ?? '';
-        
-        if (mounted) {
-          setState(() => _posStr = '$city, $country');
+        if (placemarks.isNotEmpty) {
+          final place = placemarks.first;
+          final city = place.locality ?? place.subAdministrativeArea ?? place.administrativeArea ?? 'Unknown City';
+          final subArea = place.subLocality ?? '';
+          
+          if (mounted) {
+            setState(() => _posStr = subArea.isNotEmpty ? '$subArea, $city' : city);
+          }
         }
       } else {
         if (mounted) setState(() => _posStr = 'Location Denied');
       }
     } catch (e) {
-      if (mounted) setState(() => _posStr = 'Error fetching area name');
+      if (mounted) setState(() => _posStr = 'Enable Precise Location');
     }
   }
 
