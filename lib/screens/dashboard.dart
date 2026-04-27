@@ -8,6 +8,8 @@ import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
 
 import 'package:focusmate_ai/services/api_service.dart';
+import 'package:focusmate_ai/services/accessibility_service.dart';
+import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -276,6 +278,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     
                     const SizedBox(height: 32),
+                    _LiveFocusCard(),
+                    const SizedBox(height: 24),
                     _LiveLocationCard(),
                     const SizedBox(height: 40),
                   ],
@@ -368,6 +372,114 @@ class _LiveLocationCardState extends State<_LiveLocationCard> {
           const SizedBox(width: 12),
           Text(_posStr, style: const TextStyle(fontSize: 16)),
         ],
+      ),
+    );
+  }
+}
+
+class _LiveFocusCard extends StatefulWidget {
+  @override
+  State<_LiveFocusCard> createState() => _LiveFocusCardState();
+}
+
+class _LiveFocusCardState extends State<_LiveFocusCard> {
+  String _currentApp = "Detecting...";
+  bool _isServiceEnabled = false;
+  StreamSubscription? _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkService();
+  }
+
+  Future<void> _checkService() async {
+    final enabled = await AppAccessibilityService.isServiceEnabled();
+    if (mounted) {
+      setState(() {
+        _isServiceEnabled = enabled;
+      });
+    }
+
+    if (enabled) {
+      _subscription = AppAccessibilityService.onForegroundAppChanged.listen((app) {
+        if (mounted) {
+          setState(() {
+            _currentApp = app;
+          });
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassmorphicContainer(
+      width: double.infinity,
+      height: 120,
+      borderRadius: 24,
+      blur: 20,
+      border: 1,
+      linearGradient: LinearGradient(
+        colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(5)],
+      ),
+      borderGradient: LinearGradient(
+        colors: [
+          _isServiceEnabled ? AppColors.accentCyan : Colors.orange.withAlpha(100),
+          Colors.white.withAlpha(10),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Row(
+          children: [
+            Icon(
+              _isServiceEnabled ? LucideIcons.eye : LucideIcons.alertTriangle,
+              color: _isServiceEnabled ? AppColors.accentCyan : Colors.orange,
+              size: 32,
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isServiceEnabled ? 'Live Focus Monitoring' : 'Accessibility Required',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      color: AppColors.textDim,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _isServiceEnabled ? _currentApp : 'Enable to track focus',
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (!_isServiceEnabled)
+              IconButton(
+                icon: const Icon(LucideIcons.settings, color: Colors.white70),
+                onPressed: () async {
+                  await AppAccessibilityService.openSettings();
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

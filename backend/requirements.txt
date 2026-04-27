@@ -3,3 +3,4 @@ uvicorn
 pyautogen
 pydantic
 python-dotenv
+requests
