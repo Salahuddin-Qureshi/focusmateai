@@ -7,9 +7,9 @@ class AppAccessibilityService {
   static const EventChannel _eventChannel =
       EventChannel('com.focusmate.ai/app_events');
 
-  /// Stream of foreground app package names
-  static Stream<String> get onForegroundAppChanged =>
-      _eventChannel.receiveBroadcastStream().cast<String>();
+  /// Stream of foreground app data (packageName and content metadata)
+  static Stream<Map<dynamic, dynamic>> get onForegroundAppData =>
+      _eventChannel.receiveBroadcastStream().cast<Map<dynamic, dynamic>>();
 
   /// Checks if the accessibility service is enabled in Android settings
   static Future<bool> isServiceEnabled() async {

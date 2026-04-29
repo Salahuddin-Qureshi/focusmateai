@@ -10,6 +10,7 @@ class AppUsageInfo {
   final IconData icon;
   final Color color;
   final AppCategory category;
+  final List<String> capturedContent;
 
   AppUsageInfo({
     required this.packageName,
@@ -19,6 +20,7 @@ class AppUsageInfo {
     required this.icon,
     required this.category,
     this.color = Colors.blue,
+    this.capturedContent = const [],
   });
 }
 
@@ -31,6 +33,16 @@ class DailyUsageData {
 }
 
 class UsageService {
+  static final Map<String, Set<String>> _capturedMetadata = {};
+
+  static void logMetadata(String packageName, String content) {
+    if (content.length < 10) return; // Ignore too short strings
+    _capturedMetadata.putIfAbsent(packageName, () => {}).add(content);
+  }
+
+  static List<String> getMetadataForApp(String packageName) {
+    return _capturedMetadata[packageName]?.toList() ?? [];
+  }
   static Future<bool> checkPermission() async {
     if (kIsWeb) return true;
     return await UsageStats.checkUsagePermission() ?? false;
@@ -202,6 +214,7 @@ class UsageService {
           icon: _getIconForPackage(entry.key),
           color: _getColorForPackage(entry.key),
           category: _getCategoryForPackage(entry.key),
+          capturedContent: getMetadataForApp(entry.key),
         );
       }).toList();
     } catch (e) {

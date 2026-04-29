@@ -6,9 +6,11 @@ import 'package:focusmate_ai/theme.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:focusmate_ai/services/api_service.dart';
 import 'package:focusmate_ai/services/accessibility_service.dart';
+import 'package:focusmate_ai/services/usage_service.dart';
 import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
@@ -221,40 +223,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // AI Focus Verdict
                     const Text('AI Focus Verdict', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    GlassmorphicContainer(
+                    Container(
                       width: double.infinity,
-                      height: 160,
-                      borderRadius: 24,
-                      blur: 30,
-                      border: 2,
-                      linearGradient: LinearGradient(
-                        colors: [AppColors.accentViolet.withAlpha(20), Colors.black.withAlpha(10)],
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.accentViolet.withAlpha(80), width: 2),
+                        gradient: LinearGradient(
+                          colors: [AppColors.accentViolet.withAlpha(20), Colors.black.withAlpha(10)],
+                        ),
                       ),
-                      borderGradient: const LinearGradient(
-                        colors: [AppColors.accentViolet, AppColors.accentCyan],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 20),
-                                const SizedBox(width: 8),
-                                Text('AUTO-GEN COACH', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                Row(
+                                  children: [
+                                    const Icon(LucideIcons.sparkles, color: AppColors.accentCyan, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('AUTO-GEN COACH', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(_aiVerdict, 
+                                  style: const TextStyle(height: 1.4, fontSize: 14),
+                                ),
+                                if (_isEvaluating) 
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 12.0),
+                                    child: LinearProgressIndicator(backgroundColor: Colors.white10, color: AppColors.accentCyan),
+                                  )
                               ],
                             ),
-                            const SizedBox(height: 12),
-                            Expanded(
-                              child: Text(_aiVerdict, 
-                                style: const TextStyle(height: 1.4, fontSize: 14),
-                                overflow: TextOverflow.fade,
-                              ),
-                            ),
-                            if (_isEvaluating) 
-                              const LinearProgressIndicator(backgroundColor: Colors.white10, color: AppColors.accentCyan)
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -316,8 +321,11 @@ class _LiveLocationCardState extends State<_LiveLocationCard> {
 
       if (permission == LocationPermission.whileInUse ||
           permission == LocationPermission.always) {
-        final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
+        // Fast location: get last known first, fallback to low accuracy
+        Position? pos = await Geolocator.getLastKnownPosition();
+        pos ??= await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low,
+          timeLimit: const Duration(seconds: 5),
         );
 
         List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -384,6 +392,7 @@ class _LiveFocusCard extends StatefulWidget {
 
 class _LiveFocusCardState extends State<_LiveFocusCard> {
   String _currentApp = "Detecting...";
+  String _currentContent = "";
   bool _isServiceEnabled = false;
   StreamSubscription? _subscription;
 
@@ -402,10 +411,19 @@ class _LiveFocusCardState extends State<_LiveFocusCard> {
     }
 
     if (enabled) {
-      _subscription = AppAccessibilityService.onForegroundAppChanged.listen((app) {
+      _subscription = AppAccessibilityService.onForegroundAppData.listen((data) {
         if (mounted) {
+          final pkg = data['packageName']?.toString() ?? "";
+          final content = data['content']?.toString() ?? "";
+
+          // Log the metadata so we can send it to AI later
+          if (pkg.isNotEmpty && content.isNotEmpty) {
+            UsageService.logMetadata(pkg, content);
+          }
+
           setState(() {
-            _currentApp = app;
+            _currentApp = pkg.split('.').last.toUpperCase();
+            _currentContent = content;
           });
         }
       });
@@ -420,65 +438,82 @@ class _LiveFocusCardState extends State<_LiveFocusCard> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassmorphicContainer(
+    return Container(
       width: double.infinity,
-      height: 120,
-      borderRadius: 24,
-      blur: 20,
-      border: 1,
-      linearGradient: LinearGradient(
-        colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(5)],
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: _isServiceEnabled ? AppColors.accentCyan.withAlpha(80) : Colors.orange.withAlpha(80), 
+          width: 1
+        ),
+        gradient: LinearGradient(
+          colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(5)],
+        ),
       ),
-      borderGradient: LinearGradient(
-        colors: [
-          _isServiceEnabled ? AppColors.accentCyan : Colors.orange.withAlpha(100),
-          Colors.white.withAlpha(10),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Row(
-          children: [
-            Icon(
-              _isServiceEnabled ? LucideIcons.eye : LucideIcons.alertTriangle,
-              color: _isServiceEnabled ? AppColors.accentCyan : Colors.orange,
-              size: 32,
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _isServiceEnabled ? 'Live Focus Monitoring' : 'Accessibility Required',
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      color: AppColors.textDim,
-                    ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Icon(
+                    _isServiceEnabled ? LucideIcons.eye : LucideIcons.alertTriangle,
+                    color: _isServiceEnabled ? AppColors.accentCyan : Colors.orange,
+                    size: 32,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isServiceEnabled ? _currentApp : 'Enable to track focus',
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isServiceEnabled ? 'Live Focus Monitoring' : 'Accessibility Required',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: AppColors.textDim,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _isServiceEnabled ? _currentApp : 'Enable to track focus',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (_isServiceEnabled && _currentContent.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            _currentContent,
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: AppColors.accentCyan.withAlpha(200),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                if (!_isServiceEnabled)
+                  IconButton(
+                    icon: const Icon(LucideIcons.settings, color: Colors.white70),
+                    onPressed: () async {
+                      await AppAccessibilityService.openSettings();
+                    },
+                  ),
+              ],
             ),
-            if (!_isServiceEnabled)
-              IconButton(
-                icon: const Icon(LucideIcons.settings, color: Colors.white70),
-                onPressed: () async {
-                  await AppAccessibilityService.openSettings();
-                },
-              ),
-          ],
+          ),
         ),
       ),
     );

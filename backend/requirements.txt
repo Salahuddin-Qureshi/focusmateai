@@ -1,6 +1,10 @@
 fastapi
 uvicorn
-pyautogen
 pydantic
+pydantic[email]
 python-dotenv
 requests
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

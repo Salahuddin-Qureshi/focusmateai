@@ -136,7 +136,11 @@ class _AppUsageScreenState extends State<AppUsageScreen>
               const SizedBox(height: 20),
               
               // Weekly Bar Chart
-              if (_hasPermission && !_isLoading) _buildWeeklyChart(),
+              if (_hasPermission && !_isLoading) ...[
+                _buildWeeklyChart(),
+                const SizedBox(height: 16),
+                _buildDailyScreenTimeList(),
+              ],
               
               const SizedBox(height: 32),
               
@@ -432,6 +436,56 @@ class _AppUsageScreenState extends State<AppUsageScreen>
             }),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDailyScreenTimeList() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withAlpha(10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Daily Summary',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          ..._weeklyData.map((data) {
+            final dayStr = DateFormat('EEEE, MMM d').format(data.date);
+            final h = data.totalMinutes ~/ 60;
+            final m = data.totalMinutes % 60;
+            final isToday = data.date.day == DateTime.now().day && data.date.month == DateTime.now().month;
+            
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isToday ? 'Today ($dayStr)' : dayStr,
+                    style: TextStyle(
+                      color: isToday ? AppColors.accentCyan : Colors.white70,
+                      fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  Text(
+                    h > 0 ? '${h}h ${m}m' : '${m}m',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isToday ? AppColors.accentCyan : Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

@@ -1,96 +1,61 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional
-import autogen
-import os
-from dotenv import load_dotenv
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from datetime import timedelta
 
-load_dotenv()
+import models, schemas, auth
+from database import engine, get_db
+
+# Create the database tables automatically
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FocusMate AI Backend")
 
-# Configuration for AutoGen
-config_list = [
-    {
-        "model": "gpt-4",
-        "api_key": os.getenv("OPENAI_API_KEY"),
-    }
-]
-
-class AppUsage(BaseModel):
-    name: str
-    minutes: int
-    category: str
-
-class EvaluationRequest(BaseModel):
-    user_id: str
-    goal: str
-    usage_data: List[AppUsage]
-
 @app.get("/")
-def read_root():
-    return {"status": "FocusMate AI Backend is Running"}
+def root():
+    return {"message": "FocusMate API is running! Ready for authentication."}
 
-@app.post("/analyze")
-async def analyze_focus(request: EvaluationRequest):
-    print(f"\n[RECEIVED REQUEST] User: {request.user_id} | Goal: {request.goal}")
-    print(f"[DATA] Apps detected: {len(request.usage_data)}")
-
-    # Testing Mode: If no real key is provided, return a mock response
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "your_key_here":
-        print("[MODE] Running in Mock Test Mode (No API Key)")
-        return {
-            "user_id": request.user_id,
-            "verdict": f"AI AGENT TEST: Your goal is '{request.goal}'. I see you have {len(request.usage_data)} apps used today. This is a placeholder response to confirm the connection is working!",
-            "status": "mock_evaluation"
-        }
-
-    print("[MODE] Running Real AutoGen Analysis...")
-    analyst = autogen.AssistantAgent(
-        name="Analyst",
-        system_message="You are a data analyst. Analyze app usage and categorize it as productive or distracting based on the user's goal. Be brief and objective.",
-        llm_config={"config_list": config_list},
-    )
-
-    coach = autogen.AssistantAgent(
-        name="Coach",
-        system_message="You are a productivity coach. Based on the analyst's report, give the user a 'Focus Verdict' (Success or Fail) and provide one piece of actionable advice. Be encouraging but firm.",
-        llm_config={"config_list": config_list},
-    )
-
-    user_proxy = autogen.UserProxyAgent(
-        name="UserProxy",
-        human_input_mode="NEVER",
-        max_consecutive_auto_reply=2,
-        code_execution_config=False,
-    )
-
-    # Format the prompt
-    apps_str = "\n".join([f"- {a.name}: {a.minutes} mins ({a.category})" for a in request.usage_data])
-    prompt = f"""
-    User Goal: {request.goal}
-    Today's App Usage:
-    {apps_str}
+@app.post("/signup", response_model=schemas.UserResponse)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Check if user already exists
+    db_user = db.query(models.User).filter(models.User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    Evaluate if the user was productive today towards their goal.
-    """
-
-    # Start the conversation
-    chat_result = user_proxy.initiate_chat(
-        coach,
-        message=f"I need an evaluation based on this data: {prompt}",
-        clear_history=True,
+    # Hash the password and save user
+    hashed_password = auth.get_password_hash(user.password)
+    new_user = models.User(
+        email=user.email,
+        hashed_password=hashed_password,
+        name=user.name,
+        age=user.age
     )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
 
-    # Extract the last message as the verdict
-    verdict = chat_result.summary if hasattr(chat_result, 'summary') else "Evaluation completed."
+@app.post("/login", response_model=schemas.Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Authenticate user
+    user = db.query(models.User).filter(models.User.email == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Generate JWT Token
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    return {
-        "user_id": request.user_id,
-        "verdict": verdict,
-        "raw_analysis": chat_result.chat_history
-    }
+@app.get("/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: models.User = Depends(auth.get_current_user)):
+    return current_user
 
 if __name__ == "__main__":
     import uvicorn
